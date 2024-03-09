@@ -1,40 +1,70 @@
-use rodio::{Decoder, OutputStream, Source};
+use rodio::{Decoder, OutputStream, Source, Sink};
 use std::fs::File;
 use std::io::BufReader;
 
-use eframe::egui;
+use eframe::egui::{self, Button};
+
+
+//
 
 fn main() -> Result<(), eframe::Error> {
-    /*
-    // Get a output stream handle to the default physical sound device
-    let (_stream, stream_handle) = OutputStream::try_default().unwrap();
-    // Load a sound from a file, using a path relative to Cargo.toml
-    let file = BufReader::new(File::open("../data/test.mp3").unwrap());
-    // Decode that sound file into a source
-    let source = Decoder::new(file).unwrap();
-    // Play the sound directly on the device
-    stream_handle.play_raw(source.convert_samples());
+    let (_stream, handle) = rodio::OutputStream::try_default().unwrap();
+    let sink = rodio::Sink::try_new(&handle).unwrap();
 
-    // The sound plays in a separate audio thread,
-    // so we need to keep the main thread alive while it's playing.
-    std::thread::sleep(std::time::Duration::from_secs(1));
-    */
+    let file = std::fs::File::open("data/test.mp3").unwrap();
+    //sink.append(rodio::Decoder::new(BufReader::new(file)).unwrap());
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([320.0, 240.0]),
         ..Default::default()
     };
 
-    eframe::run_native("Rustify", options, Box::new(|_| Box::<Rustify>::default()))
+    eframe::run_native("Rustify", options, Box::new(|_| Box::new(Rustify::new())))
 }
 
-#[derive(Default)]
-struct Rustify {}
+struct Rustify {
+    sink: Sink,
+    stream: OutputStream,
+    handle: rodio::OutputStreamHandle,
+}
+
+impl Rustify {
+    fn new() -> Self
+    {
+        println!("Hello, world!");
+        let (_stream, handle) = rodio::OutputStream::try_default().unwrap();
+        let sink = rodio::Sink::try_new(&handle).unwrap();
+    
+        let file = std::fs::File::open("data/test.mp3").unwrap();
+        sink.append(rodio::Decoder::new(BufReader::new(file)).unwrap());
+    
+        sink.sleep_until_end();
+        Rustify {
+            sink
+        }
+    }
+}
+
+
 
 impl eframe::App for Rustify {
-    fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.sink.empty() {
+            self.sink.append(Decoder::new(BufReader::new(File::open("data/test.mp3").unwrap())).unwrap());
+            self.sink.play();
+        }
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("text");
+            if ui.button("text").clicked(){
+                if self.sink.is_paused() {
+                    self.sink.play();
+                } else {
+                    self.sink.pause();
+                }
+                
+            }
+
         });
+
     }
 }
