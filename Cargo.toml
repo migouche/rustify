@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 eframe = "0.26.2"
+event-listener = "5.2.0"
 rodio = "0.17.3"
