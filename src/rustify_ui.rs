@@ -1,35 +1,40 @@
 use std::{
-    sync::{atomic::{AtomicBool, AtomicI32}, Arc},
+    sync::{atomic::{AtomicBool, AtomicI32, Ordering::SeqCst}, Arc},
     thread,
 };
+
 
 use eframe::egui;
 use event_listener::Event;
 
-use crate::music_player::audio_control;
+use crate::music_player::{audio_control, AudioInfo};
 pub struct Rustify {
-    event: Arc<Event>,
-    flag: Arc<AtomicBool>,
-    progress: Arc<AtomicI32>,
+    audio_info: Arc<AudioInfo>
 }
 
 impl Rustify {
     pub fn new() -> Self {
-        let event = Arc::new(Event::new());
+
+        // i should do an "atomic struct" for this stuff
+
+        let audio = Arc::new(AudioInfo::new());
+
+        /*let event = Arc::new(Event::new());
         let flag = Arc::new(AtomicBool::new(false));
-        let progress = Arc::new(AtomicI32::new(0));
-        thread::spawn({
-            let event = event.clone();
+        let progress = Arc::new(AtomicI32::new(0));*/
+        thread::spawn(
+            /*let event = event.clone();
             let flag = flag.clone();
-            let progress = progress.clone();
-            move || {
-                audio_control(event, flag, progress);
+            let progress = progress.clone();*/
+            {
+                let audio = audio.clone();
+            
+                move || audio_control(&audio)
             }
-        });
+            
+        );
         Rustify {
-            event: event.clone(),
-            flag: flag.clone(),
-            progress: progress.clone(),
+            audio_info: audio
         }
     }
 }
@@ -37,12 +42,7 @@ impl Rustify {
 impl eframe::App for Rustify {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("text");
-            if ui.button("text").clicked() {
-                println!("text");
-                self.flag.store(true, std::sync::atomic::Ordering::SeqCst);
-                assert_eq!(self.event.notify(1), 1);
-            }
+            ui.heading("Rustify");
         });
 
 
@@ -54,8 +54,7 @@ impl eframe::App for Rustify {
                 if ui.button("prev").clicked() {};
                 if ui.button("Play").clicked() {
                     println!("Play");
-                    self.flag.store(true, std::sync::atomic::Ordering::SeqCst);
-                    assert_eq!(self.event.notify(1), 1);
+                    self.audio_info.toggle_pause(SeqCst)
                 }
                 if ui.button("next").clicked() {};
                 if ui.button("loop").clicked() {};
@@ -65,11 +64,11 @@ impl eframe::App for Rustify {
         // music slider
         egui::TopBottomPanel::bottom(egui::Id::new("music slider")).show(ctx, |ui| {
             ui.vertical_centered(|ui| {
-                let mut val = self.progress.load(std::sync::atomic::Ordering::SeqCst);
+                let mut val = self.audio_info.load_progress(SeqCst);
                 let val_cp = val;
                 let r = ui.add(egui::Slider::new(&mut val, 0..=100).
                 text(format!("{}:{}", val_cp / 60, val_cp % 60).as_str()));
-                self.progress.store(val, std::sync::atomic::Ordering::SeqCst);
+                self.audio_info.store_progress(val, SeqCst);
                 if r.changed() {
                     println!("slider changed to {}", val);
                 }
